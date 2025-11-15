@@ -268,7 +268,7 @@ ${this.hasDatabase() ? this.getDatabaseEnvVars() : ''}
   // README Sections
   // ============================================================================
 
-  private getProjectOverview(isGitHubRepo: boolean = false, repoUrl?: string): DocumentationSection {
+  private getProjectOverview(isGitHubRepo: boolean = false, _repoUrl?: string): DocumentationSection {
     const aiFeature = this.hasAI()
       ? ` with ${this.getAITemplateDescription()}`
       : '';
@@ -441,9 +441,9 @@ ${scripts.join('\n')}`,
     };
   }
 
-  private getDeploymentSection(isGitHubRepo: boolean = false, repoUrl?: string): DocumentationSection {
+  private getDeploymentSection(isGitHubRepo: boolean = false, _repoUrl?: string): DocumentationSection {
     if (this.config.deployment.length === 0) {
-      const githubNote = isGitHubRepo && repoUrl ? `
+      const githubNote = isGitHubRepo && _repoUrl ? `
 
 ### GitHub Integration
 
@@ -465,7 +465,7 @@ This project can be deployed to various platforms. See the deployment platform d
       };
     }
 
-    const githubIntegrationNote = isGitHubRepo && repoUrl ? `
+    const githubIntegrationNote = isGitHubRepo && _repoUrl ? `
 
 ### GitHub-Connected Deployment
 
