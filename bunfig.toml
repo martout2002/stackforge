@@ -1,0 +1,20 @@
+# Bun configuration - use bun for all package management
+[install]
+# Use bun for installing packages
+auto = "bun"
+# Prefer bun.lockb over package-lock.json or yarn.lock
+lockfile = true
+# Save exact versions in package.json
+exact = false
+# Use workspaces if available
+workspaces = true
+
+[run]
+# Use bun for running scripts
+bun = true
+# Prefer bun over node
+prefer = "bun"
+
+[install.scopes]
+# Use bun for all scopes
+"@*" = { registry = "https://registry.npmjs.org/" }

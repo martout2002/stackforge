@@ -28,9 +28,19 @@ export const VALIDATION_RULES: ValidationRule[] = [
     check: (config) => config.api === 'trpc' && config.framework === 'express',
   },
   {
+    id: 'ai-framework-compatibility',
+    message:
+      'AI templates require Next.js or Monorepo framework. Please select Next.js or Monorepo to use AI features.',
+    severity: 'error',
+    check: (config) =>
+      config.aiTemplate !== 'none' &&
+      config.aiTemplate !== undefined &&
+      config.framework === 'express',
+  },
+  {
     id: 'ai-api-key',
     message:
-      "AI templates require an Anthropic API key. You'll need to add ANTHROPIC_API_KEY to your environment.",
+      "AI templates require an API key from your chosen AI provider. You'll need to add it to your environment after generation.",
     severity: 'warning',
     check: (config) =>
       config.aiTemplate !== 'none' && config.aiTemplate !== undefined,

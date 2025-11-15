@@ -1,7 +1,8 @@
 'use client';
 
-import { FileText, Package, Clock, Folder, File } from 'lucide-react';
+import { FileText, Package, Clock, Folder, File, Key } from 'lucide-react';
 import type { ScaffoldConfig } from '@/types';
+import { getAITemplateById, getAIProviderById } from '@/lib/constants/ai-templates';
 
 interface PreviewPanelProps {
   config: ScaffoldConfig;
@@ -13,6 +14,7 @@ export function PreviewPanel({ config, className = '' }: PreviewPanelProps) {
   const estimatedGenerationTime = calculateGenerationTime(config);
   const fileList = generateFileList(config);
   const techSummary = generateTechSummary(config);
+  const envVars = generateEnvVars(config);
 
   return (
     <div className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow fade-in ${className}`}>
@@ -55,6 +57,21 @@ export function PreviewPanel({ config, className = '' }: PreviewPanelProps) {
             ))}
           </div>
         </div>
+
+        {/* Environment Variables */}
+        {envVars.length > 0 && (
+          <div>
+            <h4 className="text-xs md:text-sm font-semibold mb-2 md:mb-3 flex items-center gap-2">
+              <Key size={14} className="md:w-4 md:h-4" />
+              Environment Variables
+            </h4>
+            <div className="bg-gray-50 rounded-lg p-2 md:p-3 space-y-2">
+              {envVars.map((envVar) => (
+                <EnvVarItem key={envVar.envKey} {...envVar} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* File Structure Preview */}
         <div>
@@ -107,6 +124,35 @@ function TechSummaryItem({ category, value }: TechSummaryItemProps) {
     <div className="flex items-center justify-between py-1.5 md:py-2 border-b last:border-b-0">
       <span className="text-xs md:text-sm text-gray-600">{category}</span>
       <span className="text-xs md:text-sm font-medium truncate ml-2">{value}</span>
+    </div>
+  );
+}
+
+interface EnvVarItemProps {
+  envKey: string;
+  description: string;
+  setupUrl?: string;
+}
+
+function EnvVarItem({ envKey, description, setupUrl }: EnvVarItemProps) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <code className="text-xs md:text-sm font-mono text-purple-600 bg-purple-50 px-2 py-1 rounded">
+          {envKey}
+        </code>
+      </div>
+      <p className="text-[10px] md:text-xs text-gray-600">{description}</p>
+      {setupUrl && (
+        <a
+          href={setupUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10px] md:text-xs text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+        >
+          Get API key →
+        </a>
+      )}
     </div>
   );
 }
@@ -283,7 +329,28 @@ function generateFileList(config: ScaffoldConfig): string[] {
 
   // AI template files
   if (config.aiTemplate && config.aiTemplate !== 'none') {
-    files.push('app/api/chat/route.ts', 'components/ChatInterface.tsx');
+    const aiTemplate = getAITemplateById(config.aiTemplate);
+    if (aiTemplate) {
+      // Add API routes (remove 'src/' prefix to match other file paths)
+      aiTemplate.generatedFiles.apiRoutes.forEach((route) => {
+        const normalizedPath = route.startsWith('src/') ? route.substring(4) : route;
+        files.push(normalizedPath);
+      });
+      
+      // Add pages (remove 'src/' prefix to match other file paths)
+      aiTemplate.generatedFiles.pages.forEach((page) => {
+        const normalizedPath = page.startsWith('src/') ? page.substring(4) : page;
+        files.push(normalizedPath);
+      });
+      
+      // Add components if any (remove 'src/' prefix to match other file paths)
+      if (aiTemplate.generatedFiles.components) {
+        aiTemplate.generatedFiles.components.forEach((component) => {
+          const normalizedPath = component.startsWith('src/') ? component.substring(4) : component;
+          files.push(normalizedPath);
+        });
+      }
+    }
   }
 
   // Deployment files
@@ -314,6 +381,76 @@ function generateFileList(config: ScaffoldConfig): string[] {
   files.push('SETUP.md');
 
   return files.sort();
+}
+
+function generateEnvVars(config: ScaffoldConfig): EnvVarItemProps[] {
+  const envVars: EnvVarItemProps[] = [];
+
+  // Add AI provider API key if AI template is selected
+  if (config.aiTemplate && config.aiTemplate !== 'none' && config.aiProvider) {
+    const provider = getAIProviderById(config.aiProvider);
+    if (provider) {
+      envVars.push({
+        envKey: provider.apiKeyName,
+        description: `API key for ${provider.displayName}. Required for AI features.`,
+        setupUrl: provider.setupUrl,
+      });
+    }
+  }
+
+  // Add database connection strings
+  if (config.database === 'prisma-postgres' || config.database === 'drizzle-postgres') {
+    envVars.push({
+      envKey: 'DATABASE_URL',
+      description: 'PostgreSQL connection string',
+    });
+  }
+
+  if (config.database === 'supabase') {
+    envVars.push({
+      envKey: 'NEXT_PUBLIC_SUPABASE_URL',
+      description: 'Supabase project URL',
+      setupUrl: 'https://supabase.com',
+    });
+    envVars.push({
+      envKey: 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+      description: 'Supabase anonymous key',
+    });
+  }
+
+  // Add auth-related env vars
+  if (config.auth === 'nextauth') {
+    envVars.push({
+      envKey: 'NEXTAUTH_SECRET',
+      description: 'Secret for NextAuth.js session encryption',
+    });
+    envVars.push({
+      envKey: 'NEXTAUTH_URL',
+      description: 'Canonical URL of your site',
+    });
+  }
+
+  if (config.auth === 'clerk') {
+    envVars.push({
+      envKey: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+      description: 'Clerk publishable key',
+      setupUrl: 'https://clerk.com',
+    });
+    envVars.push({
+      envKey: 'CLERK_SECRET_KEY',
+      description: 'Clerk secret key',
+    });
+  }
+
+  // Add Redis if selected
+  if (config.extras.redis) {
+    envVars.push({
+      envKey: 'REDIS_URL',
+      description: 'Redis connection string',
+    });
+  }
+
+  return envVars;
 }
 
 function buildFileTree(files: string[]): TreeItem[] {

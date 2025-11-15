@@ -1,38 +1,59 @@
 'use client';
 
+import { useState, useCallback, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useConfigStore } from '@/lib/store/config-store';
 import { scaffoldConfigSchema, type ScaffoldConfig } from '@/types';
+import { getAITemplates, isFrameworkCompatibleWithAI } from '@/lib/constants/ai-templates';
+import { AITemplateCard } from '@/components/AITemplateCard';
+import { Tooltip } from '@/components/Tooltip';
 
 export function ConfigurationWizard() {
   const { config, updateConfig } = useConfigStore();
+  const [aiEnabled, setAiEnabled] = useState(config.aiTemplate !== 'none' && config.aiTemplate !== undefined);
+  const [, startTransition] = useTransition();
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-    watch,
   } = useForm<ScaffoldConfig>({
     resolver: zodResolver(scaffoldConfigSchema),
     defaultValues: config,
     mode: 'onChange',
   });
 
-  // Watch form changes and sync with store
-  const formValues = watch();
+  // Use config from store directly instead of watching form
+  const formValues = config;
 
   const onSubmit = (data: ScaffoldConfig) => {
     updateConfig(data);
   };
 
-  // Sync form changes to store in real-time
-  const handleFieldChange = (
+  // Memoize and optimize field change handler
+  const handleFieldChange = useCallback((
     field: keyof ScaffoldConfig,
     value: ScaffoldConfig[keyof ScaffoldConfig],
   ) => {
-    updateConfig({ [field]: value });
-  };
+    // Use transition to make updates non-blocking
+    startTransition(() => {
+      // If framework is changing to Express and AI template is selected, clear it
+      if (field === 'framework' && value === 'express') {
+        if (config.aiTemplate !== 'none' && config.aiTemplate !== undefined) {
+          updateConfig({ 
+            [field]: value,
+            aiTemplate: 'none'
+          });
+          // Also disable AI features toggle
+          setAiEnabled(false);
+          return;
+        }
+      }
+      
+      updateConfig({ [field]: value });
+    });
+  }, [config.aiTemplate, updateConfig]);
 
   return (
     <div className="w-full">
@@ -232,6 +253,185 @@ export function ConfigurationWizard() {
               </label>
             ))}
           </div>
+        </section>
+
+        {/* AI Features Section */}
+        <section className="bg-white rounded-lg border p-4 md:p-6 hover-lift transition-all duration-300 hover:shadow-md fade-in">
+          <div className="flex items-center gap-2 mb-3 md:mb-4">
+            <h2 className="text-lg md:text-xl font-semibold">
+              AI Features <span className="text-sm font-normal text-gray-500">(Optional)</span>
+            </h2>
+            <Tooltip content="Add pre-built AI features powered by leading providers like Anthropic, OpenAI, AWS Bedrock, and Google Gemini">
+              <div className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 text-gray-600 text-xs cursor-help hover:bg-gray-300 transition-colors">
+                ?
+              </div>
+            </Tooltip>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Add AI-powered features to your project using leading AI providers
+          </p>
+
+          {/* Framework Compatibility Warning */}
+          {formValues.framework === 'express' && (
+            <div className="mb-4 bg-red-50 border-2 border-red-200 rounded-lg p-3 md:p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-start gap-2">
+                <span className="text-red-600 text-lg">⚠️</span>
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-red-900 mb-1">
+                    Framework Incompatibility
+                  </h4>
+                  <p className="text-sm text-red-800">
+                    AI templates require Next.js or Monorepo framework. Please select Next.js or Monorepo to enable AI features.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Enable/Disable Toggle */}
+          <div className="mb-4">
+            <label className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all duration-300 ${
+              formValues.framework === 'express'
+                ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                : 'border-gray-200 hover:border-purple-300 hover:shadow-sm cursor-pointer touch-manipulation'
+            }`}>
+              <input
+                type="checkbox"
+                checked={aiEnabled}
+                disabled={formValues.framework === 'express'}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  setAiEnabled(enabled);
+                  if (!enabled) {
+                    // Clear AI template selection when disabled
+                    handleFieldChange('aiTemplate', 'none');
+                  }
+                }}
+                className="w-5 h-5 md:w-4 md:h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 disabled:cursor-not-allowed"
+                aria-label="Enable AI features"
+              />
+              <span className="text-sm md:text-base font-medium">Enable AI Features</span>
+            </label>
+          </div>
+
+          {/* AI Provider Notice - Only show when enabled */}
+          {aiEnabled && (
+            <div className="animate-in fade-in slide-in-from-top-2 duration-500">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4 mb-4 transition-all duration-300">
+                <p className="text-sm text-blue-800">
+                  <span className="font-semibold">🤖 Powered by AI:</span> Choose from multiple AI providers including Anthropic Claude, OpenAI, AWS Bedrock, and Google Gemini
+                </p>
+              </div>
+
+              {/* Template Grid */}
+              <div 
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4"
+                role="radiogroup"
+                aria-label="AI template selection"
+              >
+                {getAITemplates().map((template) => {
+                  const isCompatible = isFrameworkCompatibleWithAI(formValues.framework);
+                  const isSelected = formValues.aiTemplate === template.id;
+                  
+                  return (
+                    <div key={template.id} className="stagger-fade-in">
+                      <AITemplateCard
+                        id={template.id}
+                        title={template.title}
+                        description={template.description}
+                        icon={template.icon}
+                        features={template.features}
+                        generatedFiles={template.generatedFiles}
+                        selected={isSelected}
+                        disabled={!isCompatible}
+                        onSelect={() => {
+                          if (isCompatible) {
+                            // Toggle selection: if already selected, deselect (set to 'none')
+                            // Otherwise, select this template
+                            const newValue = isSelected ? 'none' : template.id;
+                            handleFieldChange('aiTemplate', newValue);
+                          }
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Setup Instructions and Links */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3 transition-all duration-300 hover:shadow-sm">
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-600 text-lg">⚠️</span>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-amber-900 mb-1">
+                      API Key Required
+                    </h4>
+                    <p className="text-sm text-amber-800 mb-2">
+                      You'll need to obtain an API key from your chosen AI provider after generating your project.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t border-amber-200 pt-3">
+                  <p className="text-xs font-semibold text-amber-900 uppercase mb-2">
+                    Get Your API Keys:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <a
+                      href="https://console.anthropic.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-purple-600 hover:text-purple-800 underline flex items-center gap-1 transition-all duration-200 hover:gap-2"
+                    >
+                      Anthropic Claude
+                      <svg className="w-3 h-3 transition-transform duration-200 hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                    <a
+                      href="https://platform.openai.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-purple-600 hover:text-purple-800 underline flex items-center gap-1 transition-all duration-200 hover:gap-2"
+                    >
+                      OpenAI
+                      <svg className="w-3 h-3 transition-transform duration-200 hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                    <a
+                      href="https://aws.amazon.com/bedrock/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-purple-600 hover:text-purple-800 underline flex items-center gap-1 transition-all duration-200 hover:gap-2"
+                    >
+                      AWS Bedrock
+                      <svg className="w-3 h-3 transition-transform duration-200 hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                    <a
+                      href="https://ai.google.dev/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-purple-600 hover:text-purple-800 underline flex items-center gap-1 transition-all duration-200 hover:gap-2"
+                    >
+                      Google Gemini
+                      <svg className="w-3 h-3 transition-transform duration-200 hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="border-t border-amber-200 pt-3">
+                  <p className="text-xs text-amber-800">
+                    <span className="font-semibold">📚 Setup Documentation:</span> After generation, check the README.md and SETUP.md files in your project for detailed configuration instructions.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Styling Section */}

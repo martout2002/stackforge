@@ -136,6 +136,28 @@
 }
 
 @layer utilities {
+  /* Performance optimizations for interactive elements */
+  button,
+  label,
+  [role="button"],
+  [role="radio"],
+  input[type="radio"],
+  input[type="checkbox"] {
+    /* Use GPU acceleration for smoother interactions */
+    will-change: transform;
+    transform: translateZ(0);
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Instant visual feedback on touch/click */
+  button:active,
+  label:active,
+  [role="button"]:active,
+  [role="radio"]:active {
+    transform: scale(0.98) translateZ(0);
+    transition: transform 0.05s ease-out;
+  }
+  
   /* Smooth fade-in animation */
   .fade-in {
     animation: fadeIn 0.3s ease-in-out;
@@ -214,5 +236,32 @@
   
   .glass-dark {
     @apply bg-zinc-900/80 backdrop-blur-md border border-zinc-800/20;
+  }
+  
+  /* Smooth selection transition */
+  .selection-transition {
+    @apply transition-all duration-300 ease-out;
+  }
+  
+  /* Stagger animation for grid items */
+  .stagger-fade-in {
+    animation: fadeIn 0.4s ease-out backwards;
+  }
+  
+  .stagger-fade-in:nth-child(1) { animation-delay: 0.05s; }
+  .stagger-fade-in:nth-child(2) { animation-delay: 0.1s; }
+  .stagger-fade-in:nth-child(3) { animation-delay: 0.15s; }
+  .stagger-fade-in:nth-child(4) { animation-delay: 0.2s; }
+  .stagger-fade-in:nth-child(5) { animation-delay: 0.25s; }
+  .stagger-fade-in:nth-child(6) { animation-delay: 0.3s; }
+  
+  /* Smooth border transition */
+  .border-transition {
+    @apply transition-colors duration-300 ease-out;
+  }
+  
+  /* Responsive touch target */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
   }
 }

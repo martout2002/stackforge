@@ -100,11 +100,14 @@ export class DocumentationGenerator {
 
     // AI Integration
     if (this.hasAI()) {
+      const provider = this.config.aiProvider || 'anthropic';
+      const providerInfo = this.getAIProviderInfo(provider);
+      
       sections.push('');
       sections.push('# AI Integration');
       sections.push('# ⚠️ Keep API keys secure! Never commit real keys to version control.');
-      sections.push('# Get your API key from: https://console.anthropic.com/settings/keys');
-      sections.push('ANTHROPIC_API_KEY=sk-ant-your-key-here');
+      sections.push(`# Get your API key from: ${providerInfo.setupUrl}`);
+      sections.push(`${providerInfo.envVarName}=your-api-key-here`);
     }
 
     // Redis
@@ -285,6 +288,10 @@ ${techStackBadge}
 ---
 ` : '';
 
+    const aiProviderInfo = this.hasAI() && this.config.aiProvider
+      ? ` (${this.getAIProviderInfo(this.config.aiProvider).displayName})`
+      : '';
+
     return {
       title: 'Project Overview',
       order: 1,
@@ -300,7 +307,7 @@ ${this.config.description}${aiFeature}
 - **Database**: ${this.getDatabaseDescription()}
 - **API**: ${this.getApiLayerDescription()}
 - **Styling**: ${this.getStylingDescription()}
-- **Color Scheme**: ${this.config.colorScheme}${this.hasAI() ? `\n- **AI Template**: ${this.getAITemplateDescription()}` : ''}
+- **Color Scheme**: ${this.config.colorScheme}${this.hasAI() ? `\n- **AI Template**: ${this.getAITemplateDescription()}${aiProviderInfo}` : ''}
 ${this.config.deployment.length > 0 ? `- **Deployment**: ${this.config.deployment.join(', ')}` : ''}`,
       applicableWhen: () => true,
     };
@@ -311,6 +318,14 @@ ${this.config.deployment.length > 0 ? `- **Deployment**: ${this.config.deploymen
       ? '\n\nFor detailed setup instructions for authentication, database, and AI features, see [SETUP.md](./SETUP.md).'
       : '';
 
+    const aiPrerequisite = this.hasAI() && this.config.aiProvider
+      ? `\n- ${this.getAIProviderInfo(this.config.aiProvider).displayName} API key (for AI features)`
+      : '';
+
+    const aiEnvVarName = this.hasAI() && this.config.aiProvider
+      ? this.getAIProviderInfo(this.config.aiProvider).envVarName
+      : 'ANTHROPIC_API_KEY';
+
     return {
       title: 'Getting Started',
       order: 2,
@@ -319,7 +334,7 @@ ${this.config.deployment.length > 0 ? `- **Deployment**: ${this.config.deploymen
 ### Prerequisites
 
 - Node.js 20 or higher
-- npm, yarn, or pnpm${this.hasAI() ? '\n- Anthropic API key (for AI features)' : ''}${this.hasDatabase() && this.config.database.includes('postgres') ? '\n- PostgreSQL database (local or cloud)' : ''}
+- npm, yarn, or pnpm${aiPrerequisite}${this.hasDatabase() && this.config.database.includes('postgres') ? '\n- PostgreSQL database (local or cloud)' : ''}
 
 ### Installation
 
@@ -339,7 +354,7 @@ Copy the \`.env.example\` file to \`.env.local\`:
 cp .env.example .env.local
 \`\`\`
 
-Then fill in the required values. ${this.hasAI() ? 'You must add your \`ANTHROPIC_API_KEY\` to use AI features.' : ''}${setupInstructions}
+Then fill in the required values. ${this.hasAI() ? `You must add your \`${aiEnvVarName}\` to use AI features.` : ''}${setupInstructions}
 
 4. **Start the development server**
 
@@ -349,7 +364,7 @@ npm run dev
 
 5. **Open your browser**
 
-Navigate to [http://localhost:3000](http://localhost:3000) to see your application.`,
+Navigate to [http://localhost:3000](http://localhost:3000) to see your application.${this.hasAI() ? `\n\n6. **Try the AI features**\n\nVisit ${this.getAIFeatureRoute()} to test your AI integration.` : ''}`,
       applicableWhen: () => true,
     };
   }
@@ -505,12 +520,27 @@ ${this.config.deployment.map((platform) => `- [${this.capitalizeFirst(platform)}
     const issues: string[] = [];
 
     if (this.hasAI()) {
-      issues.push(`### AI API Key Not Working
+      const provider = this.config.aiProvider || 'anthropic';
+      const providerInfo = this.getAIProviderInfo(provider);
+      
+      issues.push(`### AI Features Not Working
 
-- Verify the key is correctly copied from [Anthropic Console](https://console.anthropic.com/settings/keys)
-- Check that there are no extra spaces in the \`.env.local\` file
-- Ensure the key starts with \`sk-ant-\`
-- Restart the development server after adding the key`);
+**API Key Issues:**
+- Verify the key is correctly copied from [${providerInfo.displayName} Console](${providerInfo.setupUrl})
+- Check that there are no extra spaces in the \`.env.local\` file${providerInfo.keyPrefix ? `\n- Ensure the key starts with \`${providerInfo.keyPrefix}\`` : ''}
+- Verify you're using the correct environment variable: \`${providerInfo.envVarName}\`
+- Restart the development server after adding the key
+
+**Rate Limiting:**
+- Check your usage limits in the ${providerInfo.displayName} Console
+- Wait a few minutes before retrying if you hit rate limits
+- Consider upgrading your plan for higher limits
+
+**Response Issues:**
+- Check the browser console for error messages
+- Verify your account has sufficient credits/quota
+- Ensure the API endpoint is accessible (check network tab)
+- Try a simpler prompt to test basic functionality`);
     }
 
     if (this.hasAuth()) {
@@ -683,27 +713,30 @@ This guide will help you set up all the services and integrations for this proje
       return null;
     }
 
+    const provider = this.config.aiProvider || 'anthropic';
+    const providerInfo = this.getAIProviderInfo(provider);
+
     return {
       title: 'AI Integration Setup',
       order: 2,
       content: `## AI Integration Setup
 
-This project uses Anthropic's Claude AI for ${this.getAITemplateDescription()}.
+This project uses ${providerInfo.displayName} for ${this.getAITemplateDescription()}.
 
-### Step 1: Get Your Anthropic API Key
+### Step 1: Get Your ${providerInfo.displayName} API Key
 
-1. Go to [Anthropic Console](https://console.anthropic.com/)
+1. Go to [${providerInfo.displayName} Console](${providerInfo.setupUrl})
 2. Sign up or log in to your account
-3. Navigate to **Settings** > **API Keys**
-4. Click **Create Key**
-5. Copy your API key (it starts with \`sk-ant-\`)
+3. Navigate to the API Keys section
+4. Create a new API key
+5. Copy your API key${providerInfo.keyPrefix ? ` (it starts with \`${providerInfo.keyPrefix}\`)` : ''}
 
 ### Step 2: Add API Key to Environment
 
 Open your \`.env.local\` file and add:
 
 \`\`\`bash
-ANTHROPIC_API_KEY=sk-ant-your-key-here
+${providerInfo.envVarName}=your-api-key-here
 \`\`\`
 
 **Important**: Never commit your \`.env.local\` file to version control!
@@ -714,11 +747,23 @@ ANTHROPIC_API_KEY=sk-ant-your-key-here
 2. Navigate to the AI feature page: ${this.getAIFeatureRoute()}
 3. Try the AI functionality to ensure it's working
 
+### AI Template Features
+
+Your selected template (${this.getAITemplateDescription()}) includes:
+
+${this.getAITemplateFeatures()}
+
+### Generated Files
+
+The following files have been generated for your AI template:
+
+${this.getAITemplateFiles()}
+
 ### Rate Limits and Costs
 
-- Free tier: Limited requests per month
-- Pay-as-you-go: See [Anthropic Pricing](https://www.anthropic.com/pricing)
-- Monitor your usage in the Anthropic Console
+- Check the [${providerInfo.displayName} Pricing](${providerInfo.pricingUrl}) for current rates
+- Monitor your usage in the ${providerInfo.displayName} Console
+- Set up usage alerts to avoid unexpected charges
 
 ### Troubleshooting
 
@@ -726,11 +771,18 @@ ANTHROPIC_API_KEY=sk-ant-your-key-here
 - Double-check that you copied the entire key
 - Ensure there are no spaces before or after the key
 - Verify the key hasn't been revoked in the console
+- Confirm you're using the correct environment variable name
 
 **Error: "Rate limit exceeded"**
 - Wait a few minutes before retrying
-- Check your usage in the Anthropic Console
-- Consider upgrading your plan if needed`,
+- Check your usage in the ${providerInfo.displayName} Console
+- Consider upgrading your plan if needed
+
+**AI responses not working**
+- Verify the API key is set in \`.env.local\`
+- Restart the development server after adding the key
+- Check the browser console and server logs for errors
+- Ensure your account has sufficient credits/quota`,
       applicableWhen: () => this.hasAI(),
     };
   }
@@ -1727,6 +1779,117 @@ After updating callback URLs:
       'image-generator': 'http://localhost:3000/generate-image',
     };
     return routes[this.config.aiTemplate || 'none'] || 'http://localhost:3000';
+  }
+
+  private getAIProviderInfo(provider: string): {
+    displayName: string;
+    setupUrl: string;
+    pricingUrl: string;
+    envVarName: string;
+    keyPrefix?: string;
+  } {
+    const providers: Record<string, any> = {
+      anthropic: {
+        displayName: 'Anthropic Claude',
+        setupUrl: 'https://console.anthropic.com/',
+        pricingUrl: 'https://www.anthropic.com/pricing',
+        envVarName: 'ANTHROPIC_API_KEY',
+        keyPrefix: 'sk-ant-',
+      },
+      openai: {
+        displayName: 'OpenAI',
+        setupUrl: 'https://platform.openai.com/',
+        pricingUrl: 'https://openai.com/pricing',
+        envVarName: 'OPENAI_API_KEY',
+        keyPrefix: 'sk-',
+      },
+      'aws-bedrock': {
+        displayName: 'AWS Bedrock',
+        setupUrl: 'https://aws.amazon.com/bedrock/',
+        pricingUrl: 'https://aws.amazon.com/bedrock/pricing/',
+        envVarName: 'AWS_BEDROCK_CREDENTIALS',
+      },
+      gemini: {
+        displayName: 'Google Gemini',
+        setupUrl: 'https://ai.google.dev/',
+        pricingUrl: 'https://ai.google.dev/pricing',
+        envVarName: 'GEMINI_API_KEY',
+      },
+    };
+    return providers[provider] || providers.anthropic;
+  }
+
+  private getAITemplateFeatures(): string {
+    const features: Record<string, string[]> = {
+      chatbot: [
+        'Real-time streaming responses',
+        'Conversation history',
+        'Markdown rendering',
+        'Copy code blocks',
+      ],
+      'document-analyzer': [
+        'File upload support',
+        'Text extraction',
+        'AI-powered analysis',
+        'Summary generation',
+      ],
+      'semantic-search': [
+        'Vector embeddings',
+        'Semantic similarity',
+        'Intelligent ranking',
+        'Context-aware results',
+      ],
+      'code-assistant': [
+        'Code generation',
+        'Code explanation',
+        'Syntax highlighting',
+        'Multiple languages',
+      ],
+      'image-generator': [
+        'Text-to-image generation',
+        'Style customization',
+        'Image preview',
+        'Download support',
+      ],
+    };
+    const templateFeatures = features[this.config.aiTemplate || 'none'] || [];
+    return templateFeatures.map((f) => `- ${f}`).join('\n');
+  }
+
+  private getAITemplateFiles(): string {
+    const files: Record<string, { apiRoutes: string[]; pages: string[] }> = {
+      chatbot: {
+        apiRoutes: ['src/app/api/chat/route.ts'],
+        pages: ['src/app/chat/page.tsx'],
+      },
+      'document-analyzer': {
+        apiRoutes: ['src/app/api/analyze/route.ts'],
+        pages: ['src/app/analyze/page.tsx'],
+      },
+      'semantic-search': {
+        apiRoutes: ['src/app/api/search/route.ts'],
+        pages: ['src/app/search/page.tsx'],
+      },
+      'code-assistant': {
+        apiRoutes: ['src/app/api/code-assistant/route.ts'],
+        pages: ['src/app/code-assistant/page.tsx'],
+      },
+      'image-generator': {
+        apiRoutes: ['src/app/api/generate-image/route.ts'],
+        pages: ['src/app/generate-image/page.tsx'],
+      },
+    };
+    const templateFiles = files[this.config.aiTemplate || 'none'];
+    if (!templateFiles) return '- No files generated';
+
+    const sections: string[] = [];
+    sections.push('**API Routes:**');
+    templateFiles.apiRoutes.forEach((route) => sections.push(`- \`${route}\``));
+    sections.push('');
+    sections.push('**Pages:**');
+    templateFiles.pages.forEach((page) => sections.push(`- \`${page}\``));
+
+    return sections.join('\n');
   }
 
   private getDatabaseEnvVars(): string {

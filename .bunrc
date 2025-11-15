@@ -1,0 +1,5 @@
+# Bun Runtime Configuration
+# This file ensures bun is used for all operations
+
+# Use bun for package management
+BUN_INSTALL_BIN=$HOME/.bun/bin

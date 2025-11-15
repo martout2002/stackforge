@@ -27,10 +27,10 @@ function getCacheKey(config: ScaffoldConfig): string {
 
 /**
  * Custom hook for real-time validation with debouncing and caching
- * Ensures validation runs within 100ms of config changes
+ * Ensures validation runs within 300ms of config changes for better UX
  * Caches results to avoid redundant validation
  */
-export function useValidation(config: ScaffoldConfig, debounceMs = 100) {
+export function useValidation(config: ScaffoldConfig, debounceMs = 300) {
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
     errors: [],
@@ -38,37 +38,63 @@ export function useValidation(config: ScaffoldConfig, debounceMs = 100) {
   });
   const [isValidating, setIsValidating] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCacheKeyRef = useRef<string>('');
 
   const runValidation = useCallback((configToValidate: ScaffoldConfig) => {
-    setIsValidating(true);
-    
     // Check cache first
     const cacheKey = getCacheKey(configToValidate);
+    
+    // Skip if same as last validation
+    if (cacheKey === lastCacheKeyRef.current) {
+      return;
+    }
+    
+    lastCacheKeyRef.current = cacheKey;
     const cachedResult = validationCache.get(cacheKey);
     
     if (cachedResult) {
-      // Cache hit - return immediately
+      // Cache hit - return immediately without setting isValidating
       setValidationResult(cachedResult);
-      setIsValidating(false);
       return;
     }
     
     // Cache miss - run validation
-    const result = validateConfig(configToValidate);
+    setIsValidating(true);
     
-    // Store in cache
-    validationCache.set(cacheKey, result);
-    
-    // Limit cache size (LRU-like behavior)
-    if (validationCache.size > MAX_CACHE_SIZE) {
-      const firstKey = validationCache.keys().next().value;
-      if (firstKey) {
-        validationCache.delete(firstKey);
+    // Use requestIdleCallback for non-blocking validation
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(() => {
+        const result = validateConfig(configToValidate);
+        
+        // Store in cache
+        validationCache.set(cacheKey, result);
+        
+        // Limit cache size (LRU-like behavior)
+        if (validationCache.size > MAX_CACHE_SIZE) {
+          const firstKey = validationCache.keys().next().value;
+          if (firstKey) {
+            validationCache.delete(firstKey);
+          }
+        }
+        
+        setValidationResult(result);
+        setIsValidating(false);
+      });
+    } else {
+      // Fallback for browsers without requestIdleCallback
+      const result = validateConfig(configToValidate);
+      validationCache.set(cacheKey, result);
+      
+      if (validationCache.size > MAX_CACHE_SIZE) {
+        const firstKey = validationCache.keys().next().value;
+        if (firstKey) {
+          validationCache.delete(firstKey);
+        }
       }
+      
+      setValidationResult(result);
+      setIsValidating(false);
     }
-    
-    setValidationResult(result);
-    setIsValidating(false);
   }, []);
 
   useEffect(() => {

@@ -45,6 +45,7 @@ export interface ScaffoldConfig {
     | 'code-assistant'
     | 'image-generator'
     | 'none';
+  aiProvider?: 'anthropic' | 'openai' | 'aws-bedrock' | 'gemini';
 
   // Tooling extras
   extras: {
@@ -168,6 +169,9 @@ export const scaffoldConfigSchema = z.object({
       'image-generator',
       'none',
     ])
+    .optional(),
+  aiProvider: z
+    .enum(['anthropic', 'openai', 'aws-bedrock', 'gemini'])
     .optional(),
 
   // Tooling extras

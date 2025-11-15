@@ -21,3 +21,5 @@ export { ErrorMessage, InlineError, ErrorBoundaryFallback, ERROR_MESSAGES } from
 export { GitHubAuthButton } from './GitHubAuthButton';
 export { CreateRepoModal } from './CreateRepoModal';
 export { GitHubPushProgress } from './GitHubPushProgress';
+export { AITemplateCard } from './AITemplateCard';
+export { Tooltip } from './Tooltip';
