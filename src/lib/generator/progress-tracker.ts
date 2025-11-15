@@ -2,6 +2,7 @@
  * Progress tracking for scaffold generation
  */
 
+
 export type GenerationStep =
   | 'validating'
   | 'creating-structure'
@@ -32,8 +33,6 @@ export interface GenerationProgress {
 }
 
 /**
- * In-memory progress store
- * In production, this should be replaced with Redis or similar
  */
 class ProgressStore {
   private store: Map<string, GenerationProgress> = new Map();
