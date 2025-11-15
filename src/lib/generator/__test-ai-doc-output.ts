@@ -4,11 +4,15 @@
 
 import { DocumentationGenerator } from './documentation-generator';
 import type { ScaffoldConfig } from '../../types';
+import { addFrameworkProperty } from '../../types';
 
 const config: ScaffoldConfig = {
   projectName: 'my-ai-app',
   description: 'An AI-powered application with chatbot functionality',
-  framework: 'next',
+  frontendFramework: 'nextjs',
+  backendFramework: 'nextjs-api',
+  buildTool: 'auto',
+  projectStructure: 'nextjs-only',
   nextjsRouter: 'app',
   auth: 'nextauth',
   database: 'prisma-postgres',
@@ -28,7 +32,9 @@ const config: ScaffoldConfig = {
   },
 };
 
-const docGen = new DocumentationGenerator(config);
+// Add the legacy framework property for backward compatibility
+const configWithFramework = addFrameworkProperty(config);
+const docGen = new DocumentationGenerator(configWithFramework);
 
 console.log('='.repeat(80));
 console.log('README.md PREVIEW');

@@ -19,6 +19,12 @@ import {
   generateUsersApiRoute,
 } from './templates/nextjs-templates';
 import {
+  generateTemplateDashboardPage,
+  generateTemplateSignInPage,
+  generateTemplateSignUpPage,
+  generateTemplateForgotPasswordPage,
+} from './templates/template-pages';
+import {
   generateExpressIndex,
   generateExpressRoutes,
   generateExpressMiddleware,
@@ -240,6 +246,7 @@ export class ScaffoldGenerator {
       Promise.resolve(this.generateBaseFiles(context, isGitHubRepo, repoUrl)),
       Promise.resolve(this.generateConfigFiles(context)),
       Promise.resolve(this.generateProjectFiles(context)),
+      Promise.resolve(this.generateTemplatePages()), // Always generate template pages
     ];
 
     // Conditionally add optional file generation
@@ -1627,6 +1634,50 @@ export default App;
           content: generateGraphQLUsageExample(),
         });
         break;
+    }
+
+    return files;
+  }
+
+  /**
+   * Generate template pages (dashboard and auth pages if auth is enabled)
+   * Always generated for frontend projects as boilerplate
+   */
+  private generateTemplatePages(): GeneratedFile[] {
+    const files: GeneratedFile[] = [];
+    const projectStructure = this.config.projectStructure;
+    const hasAuth = this.config.auth !== 'none';
+    
+    // Skip for Express API only (no frontend)
+    if (projectStructure === 'express-api-only') {
+      return files;
+    }
+
+    const isMonorepo = projectStructure === 'fullstack-monorepo';
+    const basePath = isMonorepo ? 'apps/web/src' : 'src';
+
+    // Always generate dashboard page
+    files.push({
+      path: `${basePath}/app/dashboard/page.tsx`,
+      content: generateTemplateDashboardPage(this.config),
+    });
+
+    // Generate auth pages if auth is enabled
+    if (hasAuth) {
+      files.push({
+        path: `${basePath}/app/signin/page.tsx`,
+        content: generateTemplateSignInPage(this.config),
+      });
+
+      files.push({
+        path: `${basePath}/app/signup/page.tsx`,
+        content: generateTemplateSignUpPage(this.config),
+      });
+
+      files.push({
+        path: `${basePath}/app/forgot-password/page.tsx`,
+        content: generateTemplateForgotPasswordPage(this.config),
+      });
     }
 
     return files;

@@ -301,14 +301,16 @@ function generateFileList(config: ScaffoldConfig): string[] {
       'app/page.tsx',
       'app/globals.css',
       'app/api/hello/route.ts',
-      'app/api/users/route.ts'
+      'app/api/users/route.ts',
+      'app/dashboard/page.tsx'
     );
   } else if (config.projectStructure === 'react-spa') {
     files.push(
       'src/App.tsx',
       'src/main.tsx',
       'src/components/index.ts',
-      'index.html'
+      'index.html',
+      'src/app/dashboard/page.tsx'
     );
     if (config.buildTool === 'vite' || config.buildTool === 'auto') {
       files.push('vite.config.ts');
@@ -320,8 +322,9 @@ function generateFileList(config: ScaffoldConfig): string[] {
       'turbo.json',
       'apps/web/package.json',
       'apps/web/next.config.ts',
-      'apps/web/app/layout.tsx',
-      'apps/web/app/page.tsx',
+      'apps/web/src/app/layout.tsx',
+      'apps/web/src/app/page.tsx',
+      'apps/web/src/app/dashboard/page.tsx',
       'apps/api/package.json',
       'apps/api/src/server.ts',
       'apps/api/src/routes/index.ts',
@@ -333,6 +336,16 @@ function generateFileList(config: ScaffoldConfig): string[] {
       'src/routes/index.ts',
       'src/controllers/index.ts',
       'src/middleware/index.ts'
+    );
+  }
+
+  // Add auth pages if auth is enabled
+  if (config.auth !== 'none' && config.projectStructure !== 'express-api-only') {
+    const basePath = config.projectStructure === 'fullstack-monorepo' ? 'apps/web/src' : 'src';
+    files.push(
+      `${basePath}/app/signin/page.tsx`,
+      `${basePath}/app/signup/page.tsx`,
+      `${basePath}/app/forgot-password/page.tsx`
     );
   }
 
