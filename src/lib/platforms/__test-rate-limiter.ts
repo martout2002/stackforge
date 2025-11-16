@@ -75,6 +75,7 @@ async function runTests() {
     console.log();
     
     console.log('=== All Tests Passed ===');
+    process.exit(0);
     
   } catch (error) {
     console.error('Test failed:', error);
