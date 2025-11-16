@@ -205,6 +205,7 @@ export class GitOperationsService {
   /**
    * Create initial commit with all files
    * This is the main method that orchestrates the entire push process
+   * Uses GitHub Contents API for empty repositories
    */
   async createInitialCommit(
     files: GeneratedFile[],
@@ -212,25 +213,125 @@ export class GitOperationsService {
     commitMessage: string = 'Initial commit from StackForge'
   ): Promise<string> {
     try {
-      // Step 1: Create blobs for all files
-      const treeItems = await this.createBlobsForFiles(files);
+      // For empty repositories, we need to create at least one file using the Contents API
+      // Then we can use the Git API for the rest
+      
+      if (files.length === 0) {
+        throw new Error('No files to commit');
+      }
 
-      // Step 2: Create a tree with all files
-      const tree = await this.createTree(treeItems);
+      // Step 1: Create the first file using Contents API (works on empty repos)
+      const firstFile = files[0]!;
+      await this.createFileViaContentsAPI(
+        firstFile.path,
+        firstFile.content,
+        'Initial commit',
+        author
+      );
 
-      // Step 3: Create a commit
-      const commit = await this.createCommit(tree.sha, commitMessage, author);
+      // Step 2: If there are more files, add them using the Git API
+      if (files.length > 1) {
+        const remainingFiles = files.slice(1);
+        
+        // Get the current main branch reference
+        const mainRef = await this.getReference('heads/main');
+        if (!mainRef) {
+          throw new Error('Main branch not found after initial file creation');
+        }
 
-      // Step 4: Update the main branch reference
-      await this.updateReference('heads/main', commit.sha);
+        // Get the current commit
+        const currentCommit = await this.getCommit(mainRef.object.sha);
+        
+        // Create blobs for remaining files
+        const treeItems = await this.createBlobsForFiles(remainingFiles);
+        
+        // Create a new tree based on the current tree
+        const newTree = await this.createTree(treeItems, currentCommit.tree.sha);
+        
+        // Create a new commit
+        const newCommit = await this.createCommit(
+          newTree.sha,
+          commitMessage,
+          author,
+          [mainRef.object.sha]
+        );
+        
+        // Update the main branch
+        await this.updateReference('heads/main', newCommit.sha);
+        
+        return newCommit.sha;
+      }
 
-      return commit.sha;
+      // If only one file, get its commit SHA
+      const mainRef = await this.getReference('heads/main');
+      return mainRef?.object.sha || '';
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to create initial commit: ${error.message}`);
       }
       throw error;
     }
+  }
+
+  /**
+   * Create a file using GitHub Contents API (works on empty repositories)
+   */
+  private async createFileViaContentsAPI(
+    path: string,
+    content: string,
+    message: string,
+    author: GitAuthor
+  ): Promise<void> {
+    const response = await fetch(
+      `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${path}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message,
+          content: Buffer.from(content).toString('base64'),
+          author: {
+            name: author.name,
+            email: author.email,
+          },
+          committer: {
+            name: author.name,
+            email: author.email,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(`Failed to create file via Contents API: ${error.message || response.statusText}`);
+    }
+  }
+
+  /**
+   * Get a commit by SHA
+   */
+  private async getCommit(sha: string): Promise<{ tree: { sha: string } }> {
+    const response = await fetch(
+      `https://api.github.com/repos/${this.owner}/${this.repo}/git/commits/${sha}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(`Failed to get commit: ${error.message || response.statusText}`);
+    }
+
+    return await response.json();
   }
 
   /**
@@ -254,6 +355,8 @@ export class GitOperationsService {
     return treeItems;
   }
 
+
+
   /**
    * Create a blob (file content) in the repository
    */
@@ -276,6 +379,8 @@ export class GitOperationsService {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
+      // GitHub returns "Git Repository is empty" for new repos - this is expected
+      // We'll handle this by using inline content in the tree instead
       throw new Error(`Failed to create blob: ${error.message || response.statusText}`);
     }
 
@@ -288,9 +393,10 @@ export class GitOperationsService {
 
   /**
    * Create a tree (directory structure) in the repository
+   * Supports both blob references (sha) and inline content
    */
   async createTree(
-    tree: Array<{ path: string; mode: string; type: string; sha: string }>,
+    tree: Array<{ path: string; mode: string; type: string; sha?: string; content?: string }>,
     baseTree?: string
   ): Promise<GitTree> {
     const response = await fetch(

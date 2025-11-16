@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useTransition } from 'react';
+import { useState, useCallback, useTransition, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useConfigStore } from '@/lib/store/config-store';
@@ -10,7 +10,7 @@ import { AITemplateCard } from '@/components/AITemplateCard';
 import { Tooltip } from '@/components/Tooltip';
 
 export function ConfigurationWizard() {
-  const { config, updateConfig } = useConfigStore();
+  const { config, updateConfig, _hasHydrated } = useConfigStore();
   const [aiEnabled, setAiEnabled] = useState(config.aiTemplate !== 'none' && config.aiTemplate !== undefined);
   const [, startTransition] = useTransition();
 
@@ -18,11 +18,20 @@ export function ConfigurationWizard() {
     register,
     handleSubmit,
     formState: { errors },
+    reset,
   } = useForm<ScaffoldConfig>({
     resolver: zodResolver(scaffoldConfigSchema),
     defaultValues: config,
     mode: 'onChange',
   });
+
+  // Reset form with persisted values after hydration
+  useEffect(() => {
+    if (_hasHydrated) {
+      reset(config);
+      setAiEnabled(config.aiTemplate !== 'none' && config.aiTemplate !== undefined);
+    }
+  }, [_hasHydrated, config, reset]);
 
   // Use config from store directly instead of watching form
   const formValues = config;

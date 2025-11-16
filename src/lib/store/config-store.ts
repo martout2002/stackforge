@@ -1,10 +1,13 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { ScaffoldConfig } from '@/types';
 
 interface ConfigState {
   config: ScaffoldConfig;
   updateConfig: (updates: Partial<ScaffoldConfig>) => void;
   resetConfig: () => void;
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
 }
 
 const defaultConfig: ScaffoldConfig = {
@@ -98,48 +101,65 @@ function autoAdjustBuildTool(
   return currentBuildTool;
 }
 
-export const useConfigStore = create<ConfigState>((set) => ({
-  config: defaultConfig,
-  updateConfig: (updates) =>
-    set((state) => {
-      // Only update if values actually changed
-      const hasChanges = Object.keys(updates).some(
-        key => state.config[key as keyof ScaffoldConfig] !== updates[key as keyof ScaffoldConfig]
-      );
-      
-      if (!hasChanges) return state;
-      
-      // Apply updates
-      let newConfig = { ...state.config, ...updates };
-      
-      // Auto-adjust backend framework if frontend framework changed
-      if (updates.frontendFramework !== undefined) {
-        newConfig.backendFramework = autoAdjustBackendFramework(
-          newConfig.frontendFramework,
-          newConfig.backendFramework
-        );
-      }
-      
-      // Auto-adjust project structure if frontend or backend changed
-      if (updates.frontendFramework !== undefined || updates.backendFramework !== undefined) {
-        newConfig.projectStructure = autoAdjustProjectStructure(
-          newConfig.frontendFramework,
-          newConfig.backendFramework,
-          newConfig.projectStructure
-        );
-      }
-      
-      // Auto-adjust build tool if frontend framework changed
-      if (updates.frontendFramework !== undefined) {
-        newConfig.buildTool = autoAdjustBuildTool(
-          newConfig.frontendFramework,
-          newConfig.buildTool
-        );
-      }
-      
-      return {
-        config: newConfig,
-      };
+export const useConfigStore = create<ConfigState>()(
+  persist(
+    (set) => ({
+      config: defaultConfig,
+      _hasHydrated: false,
+      setHasHydrated: (state) => {
+        set({
+          _hasHydrated: state
+        });
+      },
+      updateConfig: (updates) =>
+        set((state) => {
+          // Only update if values actually changed
+          const hasChanges = Object.keys(updates).some(
+            key => state.config[key as keyof ScaffoldConfig] !== updates[key as keyof ScaffoldConfig]
+          );
+          
+          if (!hasChanges) return state;
+          
+          // Apply updates
+          let newConfig = { ...state.config, ...updates };
+          
+          // Auto-adjust backend framework if frontend framework changed
+          if (updates.frontendFramework !== undefined) {
+            newConfig.backendFramework = autoAdjustBackendFramework(
+              newConfig.frontendFramework,
+              newConfig.backendFramework
+            );
+          }
+          
+          // Auto-adjust project structure if frontend or backend changed
+          if (updates.frontendFramework !== undefined || updates.backendFramework !== undefined) {
+            newConfig.projectStructure = autoAdjustProjectStructure(
+              newConfig.frontendFramework,
+              newConfig.backendFramework,
+              newConfig.projectStructure
+            );
+          }
+          
+          // Auto-adjust build tool if frontend framework changed
+          if (updates.frontendFramework !== undefined) {
+            newConfig.buildTool = autoAdjustBuildTool(
+              newConfig.frontendFramework,
+              newConfig.buildTool
+            );
+          }
+          
+          return {
+            config: newConfig,
+          };
+        }),
+      resetConfig: () => set({ config: defaultConfig }),
     }),
-  resetConfig: () => set({ config: defaultConfig }),
-}));
+    {
+      name: 'stackforge-config',
+      version: 1,
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
+  )
+);

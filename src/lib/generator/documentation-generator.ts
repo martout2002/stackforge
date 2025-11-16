@@ -364,12 +364,14 @@ npm run dev
 
 5. **Open your browser**
 
-Navigate to [http://localhost:3000](http://localhost:3000) to see your application.${this.hasAI() ? `\n\n6. **Try the AI features**\n\nVisit ${this.getAIFeatureRoute()} to test your AI integration.` : ''}`,
+Navigate to [http://localhost:3000](http://localhost:3000) to see your application.${this.getKeyRoutesInfo()}`,
       applicableWhen: () => true,
     };
   }
 
   private getProjectStructure(): DocumentationSection {
+    const additionalInfo = this.getProjectStructureDetails();
+    
     return {
       title: 'Project Structure',
       order: 3,
@@ -377,7 +379,7 @@ Navigate to [http://localhost:3000](http://localhost:3000) to see your applicati
 
 \`\`\`
 ${this.generateProjectStructureTree()}
-\`\`\``,
+\`\`\`${additionalInfo ? `\n\n${additionalInfo}` : ''}`,
       applicableWhen: () => true,
     };
   }
@@ -427,6 +429,162 @@ ${this.generateProjectStructureTree()}
 ├── README.md
 └── package.json`;
     }
+  }
+
+  /**
+   * Generate detailed information about key routes and pages
+   */
+  private getProjectStructureDetails(): string {
+    const sections: string[] = [];
+
+    // API Routes section
+    const apiRoutes = this.getApiRoutesList();
+    if (apiRoutes.length > 0) {
+      sections.push('### API Routes\n');
+      sections.push(apiRoutes.join('\n'));
+    }
+
+    // Pages section
+    const pages = this.getPagesList();
+    if (pages.length > 0) {
+      sections.push('\n### Pages\n');
+      sections.push(pages.join('\n'));
+    }
+
+    // Auth pages section
+    if (this.hasAuth()) {
+      const authPages = this.getAuthPagesList();
+      if (authPages.length > 0) {
+        sections.push('\n### Authentication Pages\n');
+        sections.push(authPages.join('\n'));
+      }
+    }
+
+    return sections.length > 0 ? sections.join('\n') : '';
+  }
+
+  /**
+   * Get list of API routes based on configuration
+   */
+  private getApiRoutesList(): string[] {
+    const routes: string[] = [];
+
+    if (this.config.framework === 'next' || this.config.framework === 'monorepo') {
+      // AI Template API routes
+      if (this.hasAI()) {
+        const aiTemplate = this.config.aiTemplate;
+        if (aiTemplate === 'chatbot') {
+          routes.push('- `POST /api/chat` - AI chatbot conversation endpoint');
+        } else if (aiTemplate === 'document-analyzer') {
+          routes.push('- `POST /api/analyze` - Document analysis endpoint');
+        } else if (aiTemplate === 'semantic-search') {
+          routes.push('- `POST /api/search` - Semantic search endpoint');
+          routes.push('- `POST /api/embed` - Generate embeddings for documents');
+        } else if (aiTemplate === 'code-assistant') {
+          routes.push('- `POST /api/code-assistant` - Code generation and explanation');
+        } else if (aiTemplate === 'image-generator') {
+          routes.push('- `POST /api/generate-image` - AI image generation');
+        }
+      }
+
+      // Auth API routes
+      if (this.hasAuth()) {
+        if (this.config.auth === 'nextauth') {
+          routes.push('- `GET/POST /api/auth/[...nextauth]` - NextAuth.js authentication endpoints');
+        }
+      }
+
+      // Database API routes (if applicable)
+      if (this.hasDatabase()) {
+        routes.push('- `GET /api/users` - User management endpoints (example)');
+      }
+    } else if (this.config.framework === 'express') {
+      routes.push('- `GET /api/health` - Health check endpoint');
+      routes.push('- `GET /api/*` - Your API routes');
+    }
+
+    return routes;
+  }
+
+  /**
+   * Get list of pages based on configuration
+   */
+  private getPagesList(): string[] {
+    const pages: string[] = [];
+
+    if (this.config.framework === 'next' || this.config.framework === 'monorepo') {
+      pages.push('- `/` - Home page');
+
+      // AI Template pages
+      if (this.hasAI()) {
+        const aiTemplate = this.config.aiTemplate;
+        if (aiTemplate === 'chatbot') {
+          pages.push('- `/chat` - AI chatbot interface');
+        } else if (aiTemplate === 'document-analyzer') {
+          pages.push('- `/analyze` - Document analyzer interface');
+        } else if (aiTemplate === 'semantic-search') {
+          pages.push('- `/search` - Semantic search interface');
+        } else if (aiTemplate === 'code-assistant') {
+          pages.push('- `/code-assistant` - Code assistant interface');
+        } else if (aiTemplate === 'image-generator') {
+          pages.push('- `/generate-image` - Image generation interface');
+        }
+      }
+
+      // Dashboard page (if auth is enabled)
+      if (this.hasAuth()) {
+        pages.push('- `/dashboard` - User dashboard (protected)');
+      }
+    }
+
+    return pages;
+  }
+
+  /**
+   * Get list of authentication pages
+   */
+  private getAuthPagesList(): string[] {
+    const pages: string[] = [];
+
+    if (this.config.auth === 'nextauth') {
+      pages.push('- `/api/auth/signin` - Sign in page');
+      pages.push('- `/api/auth/signout` - Sign out endpoint');
+      pages.push('- `/api/auth/error` - Authentication error page');
+    } else if (this.config.auth === 'clerk') {
+      pages.push('- `/sign-in` - Clerk sign in page');
+      pages.push('- `/sign-up` - Clerk sign up page');
+      pages.push('- `/user-profile` - User profile management');
+    } else if (this.config.auth === 'supabase') {
+      pages.push('- `/auth/login` - Login page');
+      pages.push('- `/auth/signup` - Sign up page');
+      pages.push('- `/auth/callback` - OAuth callback handler');
+    }
+
+    return pages;
+  }
+
+  /**
+   * Get key routes information for Getting Started section
+   */
+  private getKeyRoutesInfo(): string {
+    const info: string[] = [];
+
+    if (this.hasAI()) {
+      info.push(`\n\n6. **Try the AI features**\n\nVisit ${this.getAIFeatureRoute()} to test your AI integration.`);
+    }
+
+    if (this.hasAuth()) {
+      const authRoute = this.config.auth === 'nextauth' 
+        ? 'http://localhost:3000/api/auth/signin'
+        : this.config.auth === 'clerk'
+        ? 'http://localhost:3000/sign-in'
+        : 'http://localhost:3000/auth/login';
+      
+      const stepNum = this.hasAI() ? 7 : 6;
+      info.push(`\n\n${stepNum}. **Test authentication**\n\nVisit ${authRoute} to sign in and access the dashboard at http://localhost:3000/dashboard`);
+    }
+
+    return info.join('');
   }
 
   private getAvailableScripts(): DocumentationSection {

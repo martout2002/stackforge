@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertCircle, Download, Loader2, Github } from 'lucide-react';
+import { AlertCircle, Download, Loader2, Github, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { ScaffoldConfig, ValidationResult } from '@/types';
 import { validateForGeneration } from '@/lib/validation/validation-handler';
 import { DownloadButton } from './DownloadButton';
 import { CreateRepoModal } from './CreateRepoModal';
-import { GitHubPushProgress } from './GitHubPushProgress';
+import { GenerationProgress } from './GenerationProgress';
 import { ErrorMessage, ERROR_MESSAGES } from './ErrorMessage';
 
 interface GenerateButtonProps {
@@ -53,7 +53,7 @@ export function GenerateButton({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showRepoModal, setShowRepoModal] = useState(false);
   const [isCreatingRepo, setIsCreatingRepo] = useState(false);
-  const [githubGenerationId, setGithubGenerationId] = useState<string | null>(null);
+  const [repositoryUrl, setRepositoryUrl] = useState<string | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{
     resetTime: number;
     retryAfter: number;
@@ -113,6 +113,7 @@ export function GenerateButton({
   }) => {
     setLastRepoData(repoData);
     setRepoModalError(null);
+    setIsCreatingRepo(true);
 
     try {
       const response = await fetch('/api/github/repos/create', {
@@ -129,6 +130,8 @@ export function GenerateButton({
       const data = await response.json();
 
       if (!response.ok) {
+        setIsCreatingRepo(false);
+        
         // Handle rate limit error specially (our app rate limit)
         if (response.status === 429 && data.resetTime) {
           setRateLimitInfo({
@@ -162,13 +165,18 @@ export function GenerateButton({
       }
 
       // Success
+      setIsCreatingRepo(false);
       setShowRepoModal(false);
       setRepoModalError(null);
       setLastRepoData(null);
-      setIsCreatingRepo(true);
-      setGithubGenerationId(data.generationId);
+      setRepositoryUrl(data.repository.htmlUrl);
+      
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err) {
       console.error('Failed to create repository:', err);
+      setIsCreatingRepo(false);
       const errorMsg = err instanceof Error ? err.message : 'Network error. Please try again.';
       setRepoModalError(errorMsg);
       // Keep modal open for retry
@@ -234,40 +242,43 @@ export function GenerateButton({
     }
   };
 
-  // Show GitHub push progress if creating repository
-  if (isCreatingRepo && githubGenerationId) {
+  // Show repository success state
+  if (repositoryUrl) {
     return (
       <div className={`space-y-3 md:space-y-4 ${className}`}>
-        <GitHubPushProgress
-          generationId={githubGenerationId}
-          onComplete={() => {
-            setIsCreatingRepo(false);
-            if (onSuccess) {
-              onSuccess();
-            }
-          }}
-          onError={(errorMessage) => {
-            setIsCreatingRepo(false);
-            setError(errorMessage);
-            if (onError) {
-              onError(errorMessage);
-            }
-          }}
-          onFallbackDownload={(fallbackDownloadId) => {
-            setDownloadId(fallbackDownloadId);
-            setIsCreatingRepo(false);
-          }}
-        />
+        <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-sm">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 size={24} className="text-green-600 shrink-0 mt-0.5 animate-in zoom-in duration-300" />
+            <div className="flex-1">
+              <p className="text-base text-green-800 font-bold">
+                🎉 Repository Created Successfully!
+              </p>
+              <p className="text-sm text-green-700 mt-1">
+                Your scaffold has been pushed to GitHub and is ready to use.
+              </p>
+            </div>
+          </div>
+
+          <a
+            href={repositoryUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold text-base hover:bg-green-700 hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <ExternalLink size={18} />
+            Go to Repository
+          </a>
+        </div>
+
         <button
           onClick={() => {
-            setIsCreatingRepo(false);
-            setGithubGenerationId(null);
+            setRepositoryUrl(null);
             setDownloadId(null);
             setError(null);
           }}
           className="w-full px-4 py-2 md:px-6 text-xs md:text-sm text-gray-600 hover:text-gray-800 transition-colors touch-manipulation"
         >
-          Cancel
+          Create Another Repository
         </button>
       </div>
     );
@@ -342,11 +353,14 @@ export function GenerateButton({
           <CreateRepoModal
             isOpen={showRepoModal}
             onClose={() => {
-              setShowRepoModal(false);
-              setRepoModalError(null);
-              setLastRepoData(null);
+              if (!isCreatingRepo) {
+                setShowRepoModal(false);
+                setRepoModalError(null);
+                setLastRepoData(null);
+              }
             }}
             error={repoModalError}
+            isLoading={isCreatingRepo}
             onRetry={() => {
               if (lastRepoData) {
                 setRepoModalError(null);
@@ -354,7 +368,10 @@ export function GenerateButton({
                 handleRepoSubmit(lastRepoData);
               }
             }}
+            onErrorDismiss={() => setRepoModalError(null)}
             onSubmit={handleRepoSubmit}
+            initialName={config.projectName}
+            initialDescription={config.description}
           />
         )}
 
@@ -371,14 +388,38 @@ export function GenerateButton({
     );
   }
 
-  // Show loading state while generating
+  // Show loading state while generating with progress tracking
+  if (isGenerating && downloadId) {
+    return (
+      <div className={`space-y-3 md:space-y-4 ${className}`}>
+        <GenerationProgress
+          generationId={downloadId}
+          onComplete={(completedDownloadId) => {
+            setIsGenerating(false);
+            setDownloadId(completedDownloadId);
+            if (onSuccess) {
+              onSuccess();
+            }
+          }}
+          onError={(errorMessage) => {
+            setIsGenerating(false);
+            setError(errorMessage);
+            if (onError) {
+              onError(errorMessage);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Fallback loading state (before downloadId is set)
   if (isGenerating) {
     return (
       <div className={`space-y-3 md:space-y-4 ${className}`}>
         <div className="flex flex-col items-center justify-center p-8 space-y-4">
           <Loader2 size={32} className="animate-spin text-purple-600" />
-          <p className="text-sm text-gray-600">Generating your scaffold...</p>
-          <p className="text-xs text-gray-500">This may take a few seconds</p>
+          <p className="text-sm text-gray-600">Starting generation...</p>
         </div>
       </div>
     );

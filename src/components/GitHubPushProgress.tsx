@@ -309,15 +309,15 @@ export function GitHubPushProgress({
 
       {/* Success State */}
       {currentStep === 'complete' && repositoryUrl && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-sm">
           <div className="flex items-start gap-2">
-            <CheckCircle2 size={20} className="text-green-600 shrink-0 mt-0.5 animate-in zoom-in duration-300" />
+            <CheckCircle2 size={24} className="text-green-600 shrink-0 mt-0.5 animate-in zoom-in duration-300" />
             <div className="flex-1">
-              <p className="text-sm text-green-800 font-medium">
-                Repository Created Successfully!
+              <p className="text-base text-green-800 font-bold">
+                🎉 Repository Created Successfully!
               </p>
               <p className="text-sm text-green-700 mt-1">
-                Your scaffold has been pushed to GitHub.
+                Your scaffold has been pushed to GitHub and is ready to use.
               </p>
             </div>
           </div>
@@ -326,10 +326,10 @@ export function GitHubPushProgress({
             href={repositoryUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm hover:bg-green-700 hover:shadow-md transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold text-base hover:bg-green-700 hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
           >
-            <ExternalLink size={16} />
-            View Repository
+            <ExternalLink size={18} />
+            Go to Repository
           </a>
         </div>
       )}

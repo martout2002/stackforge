@@ -14,6 +14,9 @@ interface CreateRepoModalProps {
   isLoading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  onErrorDismiss?: () => void;
+  initialName?: string;
+  initialDescription?: string;
 }
 
 export function CreateRepoModal({
@@ -23,9 +26,12 @@ export function CreateRepoModal({
   isLoading = false,
   error = null,
   onRetry,
+  onErrorDismiss,
+  initialName = '',
+  initialDescription = '',
 }: CreateRepoModalProps) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState(initialName);
+  const [description, setDescription] = useState(initialDescription);
   const [isPrivate, setIsPrivate] = useState(false);
   const [nameError, setNameError] = useState('');
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
@@ -33,6 +39,29 @@ export function CreateRepoModal({
     available: boolean;
     suggestions?: string[];
   } | null>(null);
+
+  // Update form when initial values change (e.g., when modal opens)
+  useEffect(() => {
+    if (isOpen) {
+      setName(initialName);
+      setDescription(initialDescription);
+    }
+  }, [isOpen, initialName, initialDescription]);
+
+  // Clear parent error when user starts typing
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
+    if (error && onErrorDismiss) {
+      onErrorDismiss();
+    }
+  };
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDescription(e.target.value);
+    if (error && onErrorDismiss) {
+      onErrorDismiss();
+    }
+  };
 
   // Debounced availability check
   useEffect(() => {
@@ -185,7 +214,7 @@ export function CreateRepoModal({
                   id="repo-name"
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={handleNameChange}
                   disabled={isLoading}
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-colors ${
                     nameError
@@ -263,7 +292,7 @@ export function CreateRepoModal({
               <textarea
                 id="repo-description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={handleDescriptionChange}
                 disabled={isLoading}
                 maxLength={maxDescriptionLength}
                 rows={3}
@@ -348,8 +377,8 @@ export function CreateRepoModal({
               >
                 {isLoading ? (
                   <>
-                    <LoadingSpinner size="sm" />
                     Creating...
+                    <LoadingSpinner size="sm" />
                   </>
                 ) : (
                   'Create Repository'
