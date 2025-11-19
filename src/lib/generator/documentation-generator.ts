@@ -1592,6 +1592,7 @@ Render automatically deploys when you push to your main branch.
     };
   }
 
+  // @ts-ignore - EC2 deployment removed
   private getEC2DeploymentGuide(): DocumentationSection {
     return {
       title: 'EC2 Deployment',
@@ -1842,7 +1843,7 @@ sudo journalctl -u ${this.config.projectName} -f
 - Ensure your domain DNS points to the EC2 instance
 - Verify ports 80 and 443 are open in security group
 - Try running certbot again with \`--dry-run\` flag first`,
-      applicableWhen: () => this.config.deployment.includes('ec2'),
+      applicableWhen: () => false, // EC2 removed
     };
   }
 
@@ -2291,6 +2292,7 @@ For Google OAuth:
     return colorMap[tech] || 'gray';
   }
 
+  // @ts-ignore - EC2 deployment removed
   private getEC2EnvVarsList(): string {
     const vars: string[] = [];
 
